@@ -6,5 +6,8 @@ export default defineNuxtConfig({
     public: {
       apiBase: "/kaka"
     }
+  },
+  typescript: {
+    typeCheck: true
   }
 })
