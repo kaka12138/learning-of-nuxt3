@@ -1,6 +1,7 @@
 <template>
     <div>
-        about page     
+        <h1>about page</h1>
+        <div>contentcontentcontentcontentcontentcontent</div>     
     </div>
 </template>
 
@@ -12,5 +13,8 @@ definePageMeta({
     middleware: defineNuxtRouteMiddleware((to, from)=> {
         console.log('about page middleware')
     }),
+    pageTransition: {
+        name: 'rotate',
+    }
 })
 </script>
