@@ -6,6 +6,11 @@
 </template>
 
 <script setup lang="ts">
+useHead({
+  title: "Home",
+  titleTemplate: `%s | Nuxt`,
+})
+
 
 const runtimeConfig = useRuntimeConfig()
 // console.log("runtimeConfig", runtimeConfig)

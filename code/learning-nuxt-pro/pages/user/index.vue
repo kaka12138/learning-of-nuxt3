@@ -9,4 +9,7 @@ definePageMeta({
     layout: "user-layout",
     middleware: "user-route-middleware",
 })
+useHead({
+  title: "User",
+})
 </script>
