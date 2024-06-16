@@ -120,4 +120,48 @@
             }
             })
         ```
+    - 注意：pick和transform优化的是将response的数据放到payload的过程，2而从发起请求到获取到response数据这个过程无法控制
 - 3. 缓存和重新获取
+    - keys
+        - useFetch和useAsyncData使用keys去阻止获取相同的数据(重复请求，用缓存)
+        - useFetch默认使用URL作为key，但是也可以在options中指定key
+        - useAsyncData使用第一个参数存在并且为string类型，就作为key。如果第一个参数是function,则useAsyncData就该次请求生成唯一key
+        - key可以使用useNuxtData获取
+    - execute/refresh
+        - 想要手动fetch数据，或者refresh数据，可以调用execute或者refresh方法
+        - execute只是refresh的别名，在不立即获取数据的场景下，从语义化层面上，execute更加合适
+    - clear
+        - 作用
+            - 清除缓存数据, 重置data, error, pending, status为初始状态
+        - 使用场景
+            - 一般用于删除另一个页面的数据
+        - 与clearNuxtData的区别
+            - clearNuxtData可以指定key去对应删除，一般用于删除useAsyncData的缓存数据, clear用于删除useFetch的缓存数据
+    - watch
+        - 作用
+            - 响应式数据发生变化时，重新执行请求
+        - 注意
+            - 如何想要在URL中使用响应式数据发起请求，建议使用Computed URL, 而不是在URL中拼接响应式数据
+        - 源码分析
+            ```ts
+            // 使用的是computed去接受URL, 根据request是否包含响应式数据, 来决定_request的值
+            const _request = computed(() => toValue(request));
+            ```
+        - **解决: Computed URL**
+            - 传递一个computed或者function(包含响应式数据)
+            ```ts
+            // 1. 此时_request等价于：computed(() => `https://jsonplaceholder.typicode.com/todos/1`);
+            // 不包含响应式数据，后续ref变化时，URL也不会变化
+            const id = ref(1)
+            const { data, refresh } = await useFetch(`https://jsonplaceholder.typicode.com/todos/${id.value}`, {
+                watch: [id]
+            })
+
+            // 2. 此时_request等价于: computed(() => `https://jsonplaceholder.typicode.com/todos/${id.value}`);
+            // 包含响应式数据，后续ref变化时，URL会跟着变化
+            const id = ref(1)
+            const { data, refresh } = await useFetch(() =>`https://jsonplaceholder.typicode.com/todos/${id.value}`, {
+                watch: [id]
+            })
+            ```
+        - 本质: 传递给computed的值是否有可收集的依赖
