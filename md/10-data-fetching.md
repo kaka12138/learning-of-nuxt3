@@ -8,6 +8,9 @@
 - 7. 总结
 - 8. 返回值
 - 9. 请求配置项 --- options
+- 10. Headers和cookies
+- 11. Serializing Data
+- 12. 其他
 
 ### 概述
 - 1. Nuxt提供composables去处理应用内的数据获取
@@ -79,8 +82,7 @@
     - status
         - 反应数据请求完成的状态(idle, pending, error, success)
 
-### 请求配置项 --- options
-- useFetch和useAsyncData公共的请求配置项
+### 请求配置项 --- options(useFetch和useAsyncData公共的请求配置项)
 - 1. 只在客户端请求
     - lazy
         - 默认值false, 
@@ -165,3 +167,147 @@
             })
             ```
         - 本质: 传递给computed的值是否有可收集的依赖
+- 4. 非立即执行
+    - immediate
+        - true (默认)
+            - 默认立即执行请求,
+        - false
+            - 使用excute手动执行
+        - status和请求的关系
+            - idle: 请求还未开始
+            - pending: 请求已经开始, 但是还未完成
+            - error: 请求失败
+            - success: 请求成功
+
+
+### Headers和cookies
+- 1. 概述
+    - 1. 当在浏览器端调用$fetch时, 用户的请求头和cookie被传递给服务端(API)
+    - 2. 在SSR下，$fetch的请求是发生服务器之间, 请求时是不会包含用户浏览器的cookies, 也不会传递来自fetch response的cookies
+- 2. 传递客户端Headers到服务端(API)
+    - 1. useRequestHeaders可以将cookies代理到服务器端(API), 以便服务端可以拿到cookies
+- 3. **注意**
+    - **在传递headers时，请选择需要的请求头传递而不是将所有的请求头都传递，因为并非所有标头都可以安全地被绕过，并且可能会引入不需要的行为**
+    - **以下请求头不会被代理**
+        - host, accept
+        - content-length, content-md5, content-type
+        - x-forwarded-host, x-forwarded-port, x-forwarded-proto
+        - cf-connecting-ip, cf-ray
+- 4. 将来在服务端的cookies传递到SSR Response中, 以便可以在客户端获取
+    - 从服务端获取cookies信息
+    ```ts
+    // composables/fetch.ts
+    import { appendResponseHeader, H3Event } from 'h3'
+    export const fetchWithCookie = async (event: H3Event, url: string) => {
+        /* Get the response from the server endpoint */
+        const res = await $fetch.raw(url)
+        /* Get the cookies from the response */
+        const cookies = (res.headers.get('set-cookie') || '').split(',')
+        /* Attach each cookie to our incoming Request */
+        for (const cookie of cookies) {
+            appendResponseHeader(event, 'set-cookie', cookie)
+        }
+        /* Return the data of the response */
+        return res._data
+    }
+
+    ```
+    - 在客户端获取cookies信息
+    ```ts
+    <script setup lang="ts">
+        // This composable will automatically pass cookies to the client
+        const event = useRequestEvent()
+
+        const { data: result } = await useAsyncData(() => fetchWithCookie(event, '/api/with-cookie'))
+
+        onMounted(() => console.log(document.cookie))
+    </script>
+    ```
+
+### Serializing Data
+- 1. 序列化数据来自服务端并传递给客户端
+    - 在使用useAsyncData和useLazyAsyncData时, 服务端获取或的数据将放到payload中传递到客户端, 而payload是使用**devalue库**序列化的
+    - 所以，不仅可以传递基础的JSON数据, 还可以序列化和反序列化更多类型的数据, regular expressions, Dates, Map and Set, ref, reactive, shallowRef, shallowReactive and NuxtError - and more
+    - 对于Nuxt不支持的类型, 可以自定义序列化处理器和反序列化处理器并通过useNuxtApp去处理
+    - **注意：这不适用于使用 $fetch 或 useFetch 获取时从服务器路由(server routes)传递的数据**
+- 2. 序列化数据来在API Routes
+    - 1. 当获取的数据来自server 文件夹下的API Routes时, 返回的数据用JSON.stringify序列化的, Nuxt 尽力转换 $fetch 和 useFetch 的返回类型以匹配实际值
+    - 2. JSON.stringify序列化的限制: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/JSON/stringify#description
+    - 3. 自定义序列化函数
+        - 1. 如果返回的数据中，存在toJSON方法，Nuxt将不做转换，使用自定义的toJSON方法
+        ```ts
+        export default defineEventHandler(() => {
+        const data = {
+            createdAt: new Date(),
+
+            toJSON() {
+            return {
+                createdAt: {
+                year: this.createdAt.getFullYear(),
+                month: this.createdAt.getMonth(),
+                day: this.createdAt.getDate(),
+                },
+            }
+            },
+        }
+        return data
+        })
+        ```
+    - 4. 使用可以替代JSON.stringify的序列化器
+        - 1. Nuxt内部目前不支持可替代JSON.stringify的序列化器, 但是可以通过使用第三方序列化器结合toJSON方法来实现
+        ```ts
+        import superjson from 'superjson'
+
+        export default defineEventHandler(() => {
+        const data = {
+            createdAt: new Date(),
+
+            // Workaround the type conversion
+            toJSON() {
+            return this
+            }
+        }
+
+        // Serialize the output to string, using superjson
+        return superjson.stringify(data) as unknown as typeof data
+        })
+        ```
+        ```ts
+        <script setup lang="ts">
+            import superjson from 'superjson'
+
+            // `date` is inferred as { createdAt: Date } and you can safely use the Date object methods
+            const { data } = await useFetch('/api/superjson', {
+            transform: (value) => {
+                return superjson.parse(value as unknown as string)
+            },
+            })
+        </script>
+
+        ```
+### 在post请求下消费SSE
+- 1. 在get请求下消费SSE的话, 可以使用EventSource或者使用Vueuse的useEventSource
+- 2. 在post请求下消费SSE的话, 需要手动处理
+```ts
+// Make a POST request to the SSE endpoint
+const response = await $fetch<ReadableStream>('/chats/ask-ai', {
+  method: 'POST',
+  body: {
+    query: "Hello AI, how are you?",
+  },
+  responseType: 'stream',
+})
+
+// Create a new ReadableStream from the response with TextDecoderStream to get the data as text
+const reader = response.pipeThrough(new TextDecoderStream()).getReader()
+
+// Read the chunk of data as we get it
+while (true) {
+  const { value, done } = await reader.read()
+
+  if (done)
+    break
+
+  console.log('Received:', value)
+}
+```
