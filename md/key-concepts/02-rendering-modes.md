@@ -5,6 +5,7 @@
 - 4. Deploying a Static Client-Rendered App
 - 5. Hybrid Rendering
 - 6. Edge-Side Rendering
+- 7. 注意事项
 
 ### 概述
 - 1. Nuxt支持通用渲染, 客户端渲染, 混合渲染, Edge-Side Rendering
@@ -64,14 +65,21 @@
     - ssr: true(服务端渲染), false(客户端渲染-SPA)
     - cors: 自动添加cors相关的请求头, 可以被覆盖headers
     - headers: 自定义请求头
-    - swr: TODO
-    - isr: TODO
-    - prerender: TODO
+    - swr
+        - 在给服务器的响应结果添加缓存响应头, **将响应结果添缓存到服务器或者代理服务器**，swr就是配置TTL(缓存结果的有效时间), 超过TTL，在后台重新生成页面，不再使用缓存结果
+        - 可配置number或boolean, 如果为true表示永久使用缓存结果
+    - isr
+        - 作用和swr类似，**只是将响应结果添加到CDN缓存中**(目前支持的CDN平台Netlify, Vercel)
+        - 可配置number或boolean, 如果为true表示直到下次在CDN部署前, 一直使用缓存
+    - prerender: 在构建时预渲染路由, 将其渲染结果包含到打包结果中(作为静态资源)
     - experimentalNoScripts：禁用 Nuxt 脚本和 JS 资源的渲染
-    - appMiddleware:
+    - appMiddleware: 指定路由中间件
     
 
 
 ### Edge-Side Rendering
 - 1. 作用
     - 边缘渲染 (ESR) 是 Nuxt 3 中引入的一项强大功能，它允许通过内容分发网络 (CDN) 的边缘服务器将 Nuxt 应用程序渲染得更靠近用户
+
+### 注意事项
+- 1. ***请注意，使用 nuxt generated 时混合渲染不可用***
