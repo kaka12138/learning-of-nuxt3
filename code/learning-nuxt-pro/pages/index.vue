@@ -1,6 +1,6 @@
 <template>
     <div>
-        route default page
+        <p style="color: #f00;">route default page</p>
         <ul>
             <li><NuxtLink to="/about">to about page</NuxtLink></li>
             <li><NuxtLink to="/user">to user page</NuxtLink></li>
